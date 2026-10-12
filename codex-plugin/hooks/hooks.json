@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/hooks/stop.py\"",
+            "timeout": 3,
+            "statusMessage": "Arming DSH handoffs"
+          }
+        ]
+      }
+    ]
+  }
+}

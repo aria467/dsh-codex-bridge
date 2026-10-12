@@ -1,0 +1,22 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "dsh-codex-bridge",
+  "version": "0.1.3",
+  "description": "Delegate scoped work to the local DeepSeek Harness bridge and review its handoffs in Codex.",
+  "author": { "name": "aria" },
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "DSH Bridge",
+        "shortDescription": "Delegate work to local DSH",
+        "longDescription": "Send a scoped task to DeepSeek Harness, end the Codex turn, and review the recorded handoff.",
+        "developerName": "aria",
+        "category": "Productivity",
+        "capabilities": ["Interactive"],
+        "defaultPrompt": "Delegate a scoped task to DSH, then review its result."
+      },
+      "hooks": "./hooks/hooks.json",
+      "onboardingSkill": "./skills/setup/SKILL.md"
+    }
+  }
+}

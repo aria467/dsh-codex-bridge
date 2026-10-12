@@ -1,0 +1,12 @@
+# Insert the delegation bridge as one Host plugin row.
+#
+# Config values (see index.js `Config`):
+#   root        absolute path of the runtime directory; empty resolves <home>/.dsh-bridge
+#   pollMs      inbox scan interval in milliseconds
+#
+# Note: the Loader replaces a row's whole `config` object; it never deep-merges.
+- insert:
+    - id: dsh-bridge
+      name: '@local/dsh-bridge'
+      config:
+        pollMs: 1000

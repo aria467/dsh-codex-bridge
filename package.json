@@ -1,0 +1,19 @@
+{
+  "name": "@local/dsh-bridge",
+  "version": "0.1.3",
+  "private": true,
+  "type": "module",
+  "description": "File-mediated work delegation bridge: external agents drop task envelopes into an inbox directory and DeepSeek Harness runs them as ordinary sessions.",
+  "license": "MIT",
+  "exports": {
+    ".": "./index.js"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": "^3.18.1"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}
