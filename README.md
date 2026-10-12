@@ -1,118 +1,84 @@
 # DSH Codex Bridge
 
-本仓库将 DeepSeek Harness（DSH）的通用文件桥插件与 Codex 插件放在同一份源码中。Codex 可以把有明确范围的任务交给 DSH，在 DSH 桌面会话中观察进度，并在完成后读取状态与成果。其他本地代理也可依照 [`USING-DSH.md`](USING-DSH.md) 使用文件协议。
+[English](./README.md) · [简体中文](./docs/README_zh.md)
 
-## 安装（macOS）
+DSH Codex Bridge lets Codex delegate a scoped task to DeepSeek Harness (DSH), then return to the same Codex conversation to review the outcome. The repository contains a DSH plugin that accepts work from local agents and a Codex plugin that submits tasks and handles their results.
 
-需要已安装并可在终端调用的 `dsh`、`codex`、`git` 与 Python 3；DSH 须已创建 `desktop` profile。克隆到**会长期保留**的目录，再运行统一安装器：
+## Why this project exists
+
+A DSH task may take longer than a single tool call, and the person using DSH may need to watch the work, answer an approval request, or change direction. This bridge gives that work its own visible DSH session while Codex keeps the original request and reviews the outcome afterward. It is useful for coding tasks with a clear workspace, constraints, and acceptance criteria.
+
+The DSH side uses a local file protocol rather than a network service. Other agents on the same computer can use it too; see [the DSH protocol manual](./USING-DSH.md). The bridge does not expose DSH's internal tools to Codex. DSH performs the delegated task; Codex checks the result and decides what to do next.
+
+## How the handoff works
+
+1. Codex writes a task with its prompt, workspace, and permission preset to `~/.dsh-bridge/inbox/`, and records the originating Codex thread.
+2. The DSH plugin claims the task and runs it in an ordinary DSH session. The session is visible in DSH, where the user can intervene or handle approvals.
+3. DSH writes a receipt, status, and result under `outbox/`, then writes a signal under `handoffs/`.
+4. The Codex Stop hook marks the submitted task ready for handoff. A macOS LaunchAgent watches for DSH's signal; when automatic continuation is enabled and the Codex thread is idle, it starts a new turn in that thread. Codex reads the status and result, inspects actual workspace changes, and continues the original request.
+
+Automatic continuation is **off by default**. The user can always resume Codex manually with the task ID. Codex should not edit the same workspace while DSH is working, and DSH's result report is not a substitute for checking the files or running relevant tests. Approvals remain with the user in DSH.
+
+### Choose an entry point
+
+- **Using Codex:** Install both plugins below, then ask Codex to delegate a bounded task. For a first check, try: “Ask DSH to read this project's README and report its first Markdown heading and absolute path. Use a read-only permission preset; do not change files.” Check the DSH session and the returned result.
+- **Integrating another local agent:** Follow [the task envelope and handoff contract](./USING-DSH.md). That manual describes the fields, capability discovery, states, and rejection handling.
+
+## Installation
+
+The v1 installer supports **macOS**. Install DSH, Codex, Git, and Python 3 so `dsh`, `codex`, `git`, and `python3` are available in your terminal. DSH must already have a `desktop` profile. Clone this repository into a directory you will keep: DSH installs the package as a local link to that directory.
 
 ```bash
 git clone https://github.com/aria467/dsh-codex-bridge.git && cd dsh-codex-bridge && python3 scripts/install.py
 ```
 
-安装器遵循 DSH 自身的依赖与供应链策略；若 DSH 拒绝安装，会恢复原有插件链接并停止，不会绕过策略。安装器把 DSH 包链接到该目录，确认 `@local/dsh-bridge` 已在 desktop bundle 列表中，安装 Codex marketplace 插件及 macOS LaunchAgent。已有的同名本地 marketplace 会迁移到新目录。安装完成后，**请手动重启 DSH**，并重启 Codex；若 Codex 提示信任 Stop hook，请先检查后自行决定。安装器不会自动重启 DSH，也不会自动开启同线程接续。
+The installer adds `@local/dsh-bridge` to the DSH desktop profile, installs `dsh-codex-bridge@local-dsh-bridge` in Codex, and sets up the macOS handoff LaunchAgent. It does not restart either app. **Restart DSH and Codex manually** after installation. If Codex asks whether to trust the Stop hook, review that prompt yourself.
 
-检查 DSH 桥接是否已启动：
+From the checkout, verify that DSH has published its capabilities and that the Codex app-server is reachable:
 
 ```bash
 python3 codex-plugin/scripts/bridge.py check
 python3 codex-plugin/scripts/handoff.py probe
 ```
 
-先运行一个只读任务，核对 DSH 会话、`~/.dsh-bridge/outbox/` 中的状态与结果，以及 Codex 的接续行为。完成可见的 UI 验证后，如需自动接续，创建 `~/.local/state/dsh-codex-bridge/auto_resume_enabled`；删除该文件即关闭自动接续。启动 LaunchAgent 本身不会开启这个开关。
-
-## 更新与卸载
-
-更新：在克隆目录运行 `git pull`，再运行 `python3 scripts/install.py`，随后手动重启 DSH 与 Codex。不要移动或删除克隆目录，否则 DSH 的本地链接会失效。
-
-卸载：先关闭自动接续开关；运行 `codex plugin remove dsh-codex-bridge@local-dsh-bridge` 和 `codex plugin marketplace remove local-dsh-bridge`；运行 `dsh plugin --profile desktop remove @local/dsh-bridge`，检查 `~/.dsh/profiles/desktop/package.json` 的 `dsh.profile.bundles` 并移除该条目；随后手动重启 DSH。Codex 的 LaunchAgent `~/Library/LaunchAgents/com.aria.dsh-codex-bridge.plist` 可用 `launchctl bootout gui/$(id -u)/com.aria.dsh-codex-bridge` 停止，再删除 plist。历史任务与结果位于 `~/.dsh-bridge/` 和 `~/.local/state/dsh-codex-bridge/`，卸载不会自动删除它们。
-
-## 使用与边界
-
-Codex 插件的 `delegate` 技能负责构造任务，DSH 在普通桌面会话中执行。用户在 DSH 中批准、打断或修改任务后，Codex 应以最新状态为准。派活期间 Codex 不应编辑同一工作区。任务完成后先核对实际文件改动和测试结果，再继续原目标。
-
-桥接文件只供同一台机器上的本地进程使用；拥有本机用户文件读写权的进程也可能读取或写入任务内容。请不要把 `~/.dsh-bridge/` 或 Codex 状态目录提交到仓库。当前桥接只传任务文本、路径、权限预设及成果，不提供 DSH 内部工具的远程调用。模型与思考强度由 DSH 会话设置决定；可选的 agent preset 由 DSH capabilities 公布。
-
-## 故障排查
-
-- `bridge.py check` 报缺少 `capabilities.json`：确认 DSH 已重启、desktop profile 含 `@local/dsh-bridge`，并查看 DSH 插件加载日志。
-- Codex 插件仍指向旧目录：重跑统一安装器，再用 `codex plugin marketplace list --json` 检查 `local-dsh-bridge` 的 root。
-- DSH 已完成而 Codex 未接续：检查 `~/.dsh-bridge/handoffs/`、`~/.local/state/dsh-codex-bridge/`，以及 LaunchAgent 日志；自动接续开关默认关闭。可在原 Codex 线程中手动提供任务编号并读取 outbox。
-- DSH 中出现 `DeepSeek Messages transport failed`：这是模型传输失败，应先在 DSH 会话中检查其连接；桥接状态文件会记录该任务失败。
-
----
-
-## DSH 文件桥实现说明
-
-# @local/dsh-bridge
-
-A file-mediated delegation bridge for DeepSeek Harness.
-
-An external agent (Codex, Claude Code, or any program that can write a file) drops a
-task envelope into `~/.dsh-bridge/inbox/`. This plugin claims it with an atomic
-rename, runs the task as an **ordinary DSH session** in the requested workspace, and
-writes the outcome to an outbox plus a handoff signal.
-
-There is no server, no port, no token, and no protocol negotiation: both sides are
-programs on one machine exchanging files.
-
-## Why files instead of MCP
-
-MCP's complexity exists to solve cross-vendor, cross-machine, unknown-peer problems.
-This is two programs on one machine handing each other work, so the entire protocol
-layer buys nothing and costs a lot: the client's tool timeout bounds how long a task
-may run, the client may not receive server pushes, and authentication needs a
-credential channel that ambient-environment scrubbing actively removes.
-
-The filesystem has none of those properties. A task can run for hours; completion is
-a file appearing, which is exactly what a hook watches; and the whole contract is
-auditable with `cat`.
-
-## Layout
-
-```
-~/.dsh-bridge/
-├── capabilities.json   what DSH can currently do (skills, presets, commands, permissions)
-├── capabilities.md     the same, human-readable
-├── USING-DSH.md        the manual handed to external agents
-├── inbox/              external agent writes here; `.claimed`/`.rejected` are bridge-owned
-├── outbox/             receipt, status, and result per task
-└── handoffs/           one signal file per finished task
-```
-
-See `USING-DSH.md` for the contract an external agent must follow.
-
-## Design decisions worth not re-litigating
-
-- **Tasks are ordinary sessions.** They appear in the GUI sidebar, the human can watch
-  progress live, type into them, stop them, and answer their approval prompts. Nothing
-  is hidden and nothing is tagged.
-- **Cancellation belongs to the human.** There is no cancel file. Stopping work is done
-  from the GUI, and the bridge reports the outcome (`interrupted_by_user`) so the
-  external agent knows its original instruction may be stale.
-- **Approvals are never auto-answered.** The bridge only reports that a task is parked.
-  The plugin-development guidance is explicit that authorization actions are the user's.
-- **Verification is the caller's job.** `result.md` records what the session did; it does
-  not run tests or lint.
-- **Task ids are never reused, and nothing is auto-deleted.** Both follow from the
-  ledger being append-only, which is what makes manual bookkeeping possible.
-
-## Config
-
-| Field | Default | Meaning |
-|---|---|---|
-| `root` | `''` → `<home>/.dsh-bridge` | Runtime directory |
-| `pollMs` | `1000` | Inbox scan interval |
-| `manualName` | `USING-DSH.md` | Manual file name inside `root` |
-
-## Development
-
-Host plugin code has **no hot reload**: after changing `index.js`, reinstall the bundle
-and restart DSH. Config-only changes are applied live.
+Then run the read-only task above and inspect the DSH session and `outbox/` result. After a visible handoff check, enable automatic continuation only if you want it:
 
 ```bash
-node --test test/protocol.test.mjs
+touch ~/.local/state/dsh-codex-bridge/auto_resume_enabled
 ```
 
-`lib/protocol.js` is deliberately free of Cordis, filesystem, and harness dependencies
-so it can be tested outside a running host.
+Remove that file to disable it. The installer and LaunchAgent do not enable it for you.
+
+### Update and troubleshoot
+
+Run `git pull` and `python3 scripts/install.py` from the same checkout, then restart DSH and Codex manually. Keep the checkout in place while it is installed.
+
+If `bridge.py check` cannot find `capabilities.json`, confirm that DSH restarted with the desktop profile and loaded the bridge bundle. If DSH's package manager rejects an install under its supply-chain policy, the installer stops without bypassing that policy; it restores the previous plugin link when one existed. Resolve the policy condition and rerun the installer. If DSH finishes but Codex does not resume, check the automatic continuation switch, `handoffs/`, and `~/.local/state/dsh-codex-bridge/launchagent.err.log`. The task can still be reviewed manually from `outbox/`.
+
+To uninstall, disable automatic continuation, remove the Codex plugin and marketplace with `codex plugin remove dsh-codex-bridge@local-dsh-bridge` and `codex plugin marketplace remove local-dsh-bridge`, then remove the DSH package with `dsh plugin --profile desktop remove @local/dsh-bridge`. Remove its entry from `dsh.profile.bundles` in the desktop profile if it remains. Stop and remove `~/Library/LaunchAgents/com.aria.dsh-codex-bridge.plist` separately. Task history is not deleted automatically.
+
+## Local files and settings
+
+`~/.dsh-bridge/` is the **runtime directory**, not a configuration file. It contains task prompts and results, so treat it as private local data rather than repository content.
+
+| Path | Purpose |
+| --- | --- |
+| `capabilities.json`, `capabilities.md` | DSH's current presets, skills, commands, and permissions in machine-readable and readable forms. |
+| `USING-DSH.md` | Optional local protocol manual; the capabilities manifest points to its configured path. |
+| `inbox/` | Incoming task JSON; DSH also keeps claimed or rejected envelopes here. |
+| `outbox/` | Per-task receipt, current status, and Markdown result. |
+| `handoffs/` | Signals that a task has reached a handoff state. |
+
+The DSH plugin's configuration fields are separate from those runtime files:
+
+| Field | Default | Purpose |
+| --- | --- | --- |
+| `root` | Empty, meaning `~/.dsh-bridge` | Runtime directory. A custom root must also be configured on the Codex side. |
+| `pollMs` | `1000` | Interval in milliseconds for scanning the inbox. |
+| `manualName` | `USING-DSH.md` | Name of the protocol manual path published in the capabilities manifest. |
+
+Codex keeps task bookkeeping and the `auto_resume_enabled` switch under `~/.local/state/dsh-codex-bridge/`. These are not DSH plugin settings. For the full file contract, use [the protocol manual](./USING-DSH.md).
+
+## License
+
+Released under the [MIT License](./LICENSE).
