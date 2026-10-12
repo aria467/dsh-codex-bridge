@@ -7,6 +7,6 @@
 # Note: the Loader replaces a row's whole `config` object; it never deep-merges.
 - insert:
     - id: dsh-bridge
-      name: '@local/dsh-bridge'
+      name: '@aria467/dsh-bridge'
       config:
         pollMs: 1000

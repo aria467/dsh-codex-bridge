@@ -32,7 +32,7 @@ DSH 端使用本地文件协议，不启动网络服务。同一台电脑上的�
 git clone https://github.com/aria467/dsh-codex-bridge.git && cd dsh-codex-bridge && python3 scripts/install.py
 ```
 
-安装器会把 `@local/dsh-bridge` 加入 DSH desktop profile，安装 Codex 插件 `dsh-codex-bridge@local-dsh-bridge`，并设置 macOS 交接 LaunchAgent。它不会重启应用。安装后请**手动重启 DSH 和 Codex**。若 Codex 提示是否信任 Stop hook，请自行核查该提示。
+安装器会将此仓库中的 `@aria467/dsh-bridge` 以本地链接加入 DSH desktop profile，安装 Codex 插件 `dsh-codex-bridge@local-dsh-bridge`，并设置 macOS 交接 LaunchAgent。若已安装旧版 `@local/dsh-bridge`，安装器会在加入新包后移除旧包和旧 bundle 条目；新包并非从 npm 下载。安装器不会重启应用。安装后请**手动重启 DSH 和 Codex**。若 Codex 提示是否信任 Stop hook，请自行核查该提示。
 
 在仓库目录运行以下命令，检查 DSH 是否已发布能力信息，以及 Codex app-server 是否可连接：
 
@@ -47,15 +47,15 @@ python3 codex-plugin/scripts/handoff.py probe
 touch ~/.local/state/dsh-codex-bridge/auto_resume_enabled
 ```
 
-删除该文件即可关闭自动接续。安装器和 LaunchAgent 都不会替你开启此开关。
+删除该文件即可关闭自动接续。安装器和 LaunchAgent 都不会替你开启此开关；重新安装会保留已有的开关状态。
 
 ### 更新与排障
 
 在同一个克隆目录执行 `git pull` 和 `python3 scripts/install.py`，然后手动重启 DSH 与 Codex。安装期间不要移动或删除该目录。
 
-若 `bridge.py check` 找不到 `capabilities.json`，确认 DSH 已重启、使用 desktop profile，且加载了桥接插件。若 DSH 包管理器因供应链策略拒绝安装，安装器会停止，不会绕过该策略；原先存在插件链接时，它会恢复旧链接。解决策略限制后重试即可。若 DSH 已完成而 Codex 没有接续，检查自动接续开关、`handoffs/` 和 `~/.local/state/dsh-codex-bridge/launchagent.err.log`；仍可从 `outbox/` 手动核对任务成果。
+若 `bridge.py check` 找不到 `capabilities.json`，确认 DSH 已重启、使用 desktop profile，且加载了桥接插件。若 DSH 包管理器因供应链策略拒绝安装，安装器会停止，不会绕过该策略；原先存在插件链接时，它会恢复旧链接。解决策略限制后重试即可。若 DSH 无法移除旧本地包，安装器会先备份 profile 与 lockfile，再只清除旧包的本地链接记录。若 DSH 已完成而 Codex 没有接续，检查自动接续开关、`handoffs/` 和 `~/.local/state/dsh-codex-bridge/launchagent.err.log`；仍可从 `outbox/` 手动核对任务成果。
 
-卸载时，先关闭自动接续，再运行 `codex plugin remove dsh-codex-bridge@local-dsh-bridge`、`codex plugin marketplace remove local-dsh-bridge` 和 `dsh plugin --profile desktop remove @local/dsh-bridge`。若 desktop profile 的 `dsh.profile.bundles` 中仍有该插件条目，需手动移除。`~/Library/LaunchAgents/com.aria.dsh-codex-bridge.plist` 也需单独停止并删除。历史任务与结果不会自动删除。
+卸载时，先关闭自动接续，再运行 `codex plugin remove dsh-codex-bridge@local-dsh-bridge`、`codex plugin marketplace remove local-dsh-bridge` 和 `dsh plugin --profile desktop remove @aria467/dsh-bridge`。若 desktop profile 的 `dsh.profile.bundles` 中仍有该插件条目，需手动移除。`~/Library/LaunchAgents/com.aria.dsh-codex-bridge.plist` 也需单独停止并删除。历史任务与结果不会自动删除。
 
 ## 本地文件与配置
 

@@ -32,7 +32,7 @@ The v1 installer supports **macOS**. Install DSH, Codex, Git, and Python 3 so `d
 git clone https://github.com/aria467/dsh-codex-bridge.git && cd dsh-codex-bridge && python3 scripts/install.py
 ```
 
-The installer adds `@local/dsh-bridge` to the DSH desktop profile, installs `dsh-codex-bridge@local-dsh-bridge` in Codex, and sets up the macOS handoff LaunchAgent. It does not restart either app. **Restart DSH and Codex manually** after installation. If Codex asks whether to trust the Stop hook, review that prompt yourself.
+The installer links `@aria467/dsh-bridge` from this checkout into the DSH desktop profile, installs `dsh-codex-bridge@local-dsh-bridge` in Codex, and sets up the macOS handoff LaunchAgent. If the older `@local/dsh-bridge` package is installed, it removes that package and bundle entry after adding the new one. The package is not fetched from npm. The installer does not restart either app. **Restart DSH and Codex manually** after installation. If Codex asks whether to trust the Stop hook, review that prompt yourself.
 
 From the checkout, verify that DSH has published its capabilities and that the Codex app-server is reachable:
 
@@ -47,15 +47,15 @@ Then run the read-only task above and inspect the DSH session and `outbox/` resu
 touch ~/.local/state/dsh-codex-bridge/auto_resume_enabled
 ```
 
-Remove that file to disable it. The installer and LaunchAgent do not enable it for you.
+Remove that file to disable it. The installer and LaunchAgent do not enable it for you; reinstalling preserves an existing switch.
 
 ### Update and troubleshoot
 
 Run `git pull` and `python3 scripts/install.py` from the same checkout, then restart DSH and Codex manually. Keep the checkout in place while it is installed.
 
-If `bridge.py check` cannot find `capabilities.json`, confirm that DSH restarted with the desktop profile and loaded the bridge bundle. If DSH's package manager rejects an install under its supply-chain policy, the installer stops without bypassing that policy; it restores the previous plugin link when one existed. Resolve the policy condition and rerun the installer. If DSH finishes but Codex does not resume, check the automatic continuation switch, `handoffs/`, and `~/.local/state/dsh-codex-bridge/launchagent.err.log`. The task can still be reviewed manually from `outbox/`.
+If `bridge.py check` cannot find `capabilities.json`, confirm that DSH restarted with the desktop profile and loaded the bridge bundle. If DSH's package manager rejects an install under its supply-chain policy, the installer stops without bypassing that policy; it restores the previous plugin link when one existed. Resolve the policy condition and rerun the installer. If DSH cannot remove the old local package, the installer backs up the profile and lockfile before removing only that local-link entry. If DSH finishes but Codex does not resume, check the automatic continuation switch, `handoffs/`, and `~/.local/state/dsh-codex-bridge/launchagent.err.log`. The task can still be reviewed manually from `outbox/`.
 
-To uninstall, disable automatic continuation, remove the Codex plugin and marketplace with `codex plugin remove dsh-codex-bridge@local-dsh-bridge` and `codex plugin marketplace remove local-dsh-bridge`, then remove the DSH package with `dsh plugin --profile desktop remove @local/dsh-bridge`. Remove its entry from `dsh.profile.bundles` in the desktop profile if it remains. Stop and remove `~/Library/LaunchAgents/com.aria.dsh-codex-bridge.plist` separately. Task history is not deleted automatically.
+To uninstall, disable automatic continuation, remove the Codex plugin and marketplace with `codex plugin remove dsh-codex-bridge@local-dsh-bridge` and `codex plugin marketplace remove local-dsh-bridge`, then remove the DSH package with `dsh plugin --profile desktop remove @aria467/dsh-bridge`. Remove its entry from `dsh.profile.bundles` in the desktop profile if it remains. Stop and remove `~/Library/LaunchAgents/com.aria.dsh-codex-bridge.plist` separately. Task history is not deleted automatically.
 
 ## Local files and settings
 
